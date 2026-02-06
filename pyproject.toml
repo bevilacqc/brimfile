@@ -40,3 +40,27 @@ converter = ["h5py"]
 Documentation = "https://prevedel-lab.github.io/brimfile/"
 Repository = "https://github.com/prevedel-lab/brimfile"
 Issues = "https://github.com/prevedel-lab/brimfile/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--strict-markers",
+    "--tb=short",
+]
+
+[tool.coverage.run]
+source = ["src/brimfile"]
+omit = ["*/tests/*", "*/converter/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

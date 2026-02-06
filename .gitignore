@@ -6,3 +6,12 @@ dist/*
 src/brimfile/converter/__pycache__/*
 # MATLAB files
 *.asv
+# Test artifacts
+*.brim.zarr/
+*.brim.zip
+.pytest_cache/
+.coverage
+htmlcov/
+__pycache__/
+*.pyc
+tests/__pycache__/
