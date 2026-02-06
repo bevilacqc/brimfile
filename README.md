@@ -60,6 +60,26 @@ all_metadata = md.all_to_dict()
 f.close()
 ```
 
+## Data Formats
+
+Starting from version 1.3.3, brimfile supports both sparse and non-sparse data formats:
+
+### Non-sparse format (new)
+In the non-sparse format, the PSD (Power Spectral Density) array is stored as a 4D array `[z, y, x, spectrum]` directly in the file. This is more efficient for data on regular 3D grids and aligns with the updated [brim file specification](https://github.com/prevedel-lab/Brillouin-standard-file/blob/main/docs/brim_file_specs.md).
+
+To create a file with non-sparse data:
+```Python
+# PSD must be 4D: [z, y, x, spectrum]
+f = File.create('myfile.brim.zarr')
+d = f.create_data_group(PSD, frequency, px_size_um=(dz, dy, dx), sparse=False)
+f.close()
+```
+
+### Sparse format (legacy)
+The sparse format stores PSD as a 2D flattened array `[N_points, spectrum]` with a separate `Cartesian_visualisation` array to map spectra to 3D spatial positions. This format is maintained for backward compatibility.
+
+By default, `create_data_group()` creates sparse format files (sparse=True) to maintain backward compatibility with existing code. All existing brim files use the sparse format and are automatically detected and handled correctly.
+
 ## Matlab support
 
 You can download the [Matlab toolbox](https://github.com/prevedel-lab/brimfile/releases/tag/matlab_toolbox_main), which is basically a wrapper around the Python brimfile package, so you can refer to the [same documentation](https://prevedel-lab.github.io/brimfile/). We only support Matlab >= R2023b, as brimfile needs Python 3.11.
