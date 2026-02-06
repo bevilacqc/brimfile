@@ -52,7 +52,15 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--strict-markers",
+    "--tb=short",
+    "--import-mode=importlib",
+]
 ```
+
+The `--import-mode=importlib` flag is used as recommended by pytest documentation for more robust test imports.
 
 ## Test Coverage
 

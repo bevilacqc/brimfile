@@ -50,6 +50,7 @@ addopts = [
     "--verbose",
     "--strict-markers",
     "--tb=short",
+    "--import-mode=importlib",
 ]
 
 [tool.coverage.run]
