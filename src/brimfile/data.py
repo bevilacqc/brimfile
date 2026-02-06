@@ -324,6 +324,24 @@ class Data:
         Synchronous wrapper for `get_spectrum_async` (see doc for `brimfile.data.Data.get_spectrum_async`)
         """
         return sync(self.get_spectrum_async(index))
+    def _linear_index_to_3d(self, index: int, shape: tuple) -> tuple:
+        """
+        Convert a linear index to 3D coordinates (z, y, x).
+        
+        Args:
+            index (int): Linear index
+            shape (tuple): Shape tuple (nZ, nY, nX)
+            
+        Returns:
+            tuple: (z, y, x) coordinates
+        """
+        nZ, nY, nX = shape
+        z = index // (nY * nX)
+        remainder = index % (nY * nX)
+        y = remainder // nX
+        x = remainder % nX
+        return (z, y, x)
+
     async def get_spectrum_async(self, index: int) -> tuple:
         """
         Retrieve a spectrum from the data group.
@@ -381,10 +399,7 @@ class Data:
                     f"index {index} out of range for PSD with {total_points} total points")
             
             # Convert linear index to z, y, x coordinates
-            z = index // (nY * nX)
-            remainder = index % (nY * nX)
-            y = remainder // nX
-            x = remainder % nX
+            z, y, x = self._linear_index_to_3d(index, (nZ, nY, nX))
             
             # map coordinates to the frequency array
             index_frequency = (z, y, x, ...)
