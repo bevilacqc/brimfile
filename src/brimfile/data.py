@@ -34,6 +34,9 @@ class Data:
         self._file = file
         self._path = path
         self._group = sync(file.open_group(path))
+        
+        # Check if data is sparse
+        self._is_sparse = self._check_if_sparse()
 
         self._spatial_map, self._spatial_map_px_size = self._load_spatial_mapping()
 
@@ -48,6 +51,47 @@ class Data:
         Returns the index of the data group.
         """
         return int(self._path.split('/')[-1].split('_')[-1])
+    
+    def _check_if_sparse(self) -> bool:
+        """
+        Check if the data is sparse (i.e., not on a regular 3D grid).
+        
+        Returns:
+            bool: True if data is sparse, False otherwise. 
+                  For backward compatibility with old files that don't have the Sparse attribute:
+                  - If Sparse attribute exists, use its value
+                  - If Sparse attribute doesn't exist, check if Cartesian_visualisation exists
+                  - If Cartesian_visualisation exists, treat as sparse (old format)
+                  - Otherwise, default to False (non-sparse)
+        """
+        try:
+            sparse_attr = sync(self._file.get_attr(self._group, 'Sparse'))
+            # Handle both boolean and string representations
+            if isinstance(sparse_attr, bool):
+                return sparse_attr
+            elif isinstance(sparse_attr, str):
+                return sparse_attr.lower() in ('true', '1', 'yes')
+            else:
+                return bool(sparse_attr)
+        except Exception:
+            # If attribute doesn't exist, check for backward compatibility
+            # Old files have Cartesian_visualisation which indicates sparse format
+            cv_path = concatenate_paths(self._path, brim_obj_names.data.cartesian_visualisation)
+            if sync(self._file.object_exists(cv_path)):
+                # Old format with Cartesian_visualisation -> sparse
+                return True
+            else:
+                # New format without Cartesian_visualisation -> non-sparse (as per spec default)
+                return False
+    
+    def is_sparse(self) -> bool:
+        """
+        Returns whether the data is sparse (not on a regular 3D grid).
+        
+        Returns:
+            bool: True if data is sparse, False otherwise.
+        """
+        return self._is_sparse
 
     def _load_spatial_mapping(self, load_in_memory: bool=True) -> tuple:
         """
@@ -67,6 +111,45 @@ class Data:
         sm_path = concatenate_paths(
             self._path, brim_obj_names.data.spatial_map)
         
+        # Check if data is non-sparse (on regular 3D grid)
+        if not self._is_sparse:
+            # For non-sparse data, PSD has shape [z, y, x, spectrum]
+            # We need to create a spatial map from the PSD shape
+            PSD_path = concatenate_paths(self._path, brim_obj_names.data.PSD)
+            if sync(self._file.object_exists(PSD_path)):
+                PSD = sync(self._file.open_dataset(PSD_path))
+                # For non-sparse data, create identity mapping
+                if PSD.ndim >= 3:
+                    nZ, nY, nX = PSD.shape[0:3]
+                    indices = np.arange(nZ * nY * nX)
+                    cv = np.reshape(indices, (nZ, nY, nX))
+                    cv = np_array_to_smallest_int_type(cv)
+                    
+                    # Try to read element_size from Data group level first
+                    px_size_val = None
+                    px_size_units = None
+                    try:
+                        px_size_val = sync(self._file.get_attr(self._group, 'element_size'))
+                        if px_size_val is not None and len(px_size_val) == 3:
+                            px_size_units = sync(units.of_attribute(self._file, self._group, 'element_size'))
+                    except Exception:
+                        # Fall back to default
+                        px_size_val = 3*(1,)
+                        warnings.warn("No pixel size defined for non-sparse data")
+                    
+                    px_size = ()
+                    for i in range(3):
+                        if isinstance(px_size_val[i], Number):
+                            px_size += (Metadata.Item(px_size_val[i], px_size_units), )
+                        else:
+                            px_size += (Metadata.Item(1, None), )
+                    
+                    if load_in_memory:
+                        cv = np.array(cv)
+            
+            return cv, px_size
+        
+        # For sparse data, check Cartesian_visualisation or Spatial_map
         if sync(self._file.object_exists(cv_path)):
             cv = sync(self._file.open_dataset(cv_path))
 
@@ -224,12 +307,15 @@ class Data:
         if frequency.ndim > 1:
             frequency = np.broadcast_to(frequency, PSD.shape)
         
-        sm = np.array(self._spatial_map)
-        # reshape the PSD to have the spatial dimensions first      
-        PSD = PSD[sm, ...]
-        # reshape the frequency pnly if it is not the same for all spectra
-        if frequency.ndim > 1:
-            frequency = frequency[sm, ...]
+        # If data is sparse, need to remap using spatial_map
+        if self._is_sparse:
+            sm = np.array(self._spatial_map)
+            # reshape the PSD to have the spatial dimensions first      
+            PSD = PSD[sm, ...]
+            # reshape the frequency only if it is not the same for all spectra
+            if frequency.ndim > 1:
+                frequency = frequency[sm, ...]
+        # For non-sparse data, PSD is already in the correct shape (z, y, x, spectrum)
 
         return PSD, frequency, PSD_units, frequency_units
 
@@ -261,26 +347,60 @@ class Data:
             self._file.open_dataset(concatenate_paths(
                 self._path, brim_obj_names.data.frequency))
             )
-        if index >= PSD.shape[0]:
-            raise IndexError(
-                f"index {index} out of range for PSD with shape {PSD.shape}") 
+        
         # retrieve the units of the PSD and frequency
         PSD_units, frequency_units = await asyncio.gather(
             units.of_object(self._file, PSD),
             units.of_object(self._file, frequency)
         )
-        # map index to the frequency array, considering the broadcasting rules
-        index_frequency = (index, ...)
-        if frequency.ndim < PSD.ndim:
-            # given the definition of the brim file format,
-            # if the frequency has less dimensions that PSD,
-            # it can only be because it is the same for all the spatial position (first dimension)
-            index_frequency = (..., )
-        #get the spectrum and the corresponding frequency at the specified index
-        PSD, frequency = await asyncio.gather(
-            _async_getitem(PSD, (index,...)),
-            _async_getitem(frequency, index_frequency)
-        )
+        
+        # For sparse data, PSD is 2D [N_points, spectrum], index directly
+        # For non-sparse data, PSD is 4D [z, y, x, spectrum], need to convert linear index to 3D
+        if self._is_sparse:
+            if index >= PSD.shape[0]:
+                raise IndexError(
+                    f"index {index} out of range for PSD with shape {PSD.shape}")
+            
+            # map index to the frequency array, considering the broadcasting rules
+            index_frequency = (index, ...)
+            if frequency.ndim < PSD.ndim:
+                # if the frequency has less dimensions than PSD,
+                # it's the same for all spatial positions
+                index_frequency = (..., )
+            #get the spectrum and the corresponding frequency at the specified index
+            PSD, frequency = await asyncio.gather(
+                _async_getitem(PSD, (index,...)),
+                _async_getitem(frequency, index_frequency)
+            )
+        else:
+            # For non-sparse, convert linear index to 3D coordinates
+            nZ, nY, nX = PSD.shape[0:3]
+            total_points = nZ * nY * nX
+            if index >= total_points:
+                raise IndexError(
+                    f"index {index} out of range for PSD with {total_points} total points")
+            
+            # Convert linear index to z, y, x coordinates
+            z = index // (nY * nX)
+            remainder = index % (nY * nX)
+            y = remainder // nX
+            x = remainder % nX
+            
+            # map coordinates to the frequency array
+            index_frequency = (z, y, x, ...)
+            if frequency.ndim == 1:
+                # frequency is same for all spatial positions
+                index_frequency = (..., )
+            elif frequency.ndim < 4:
+                # Handle case where frequency has fewer dimensions
+                index_frequency = (..., )
+            
+            #get the spectrum and the corresponding frequency at the specified coordinates
+            PSD, frequency = await asyncio.gather(
+                _async_getitem(PSD, (z, y, x, ...)),
+                _async_getitem(frequency, index_frequency)
+            )
+        
         #broadcast the frequency to match the shape of PSD if needed
         if frequency.ndim < PSD.ndim:
             frequency = np.broadcast_to(frequency, PSD.shape)
@@ -864,10 +984,30 @@ class Data:
                 for k in dn.keys():
                     if not k.endswith('_units'):
                         d = dn[k]
-                        if d.ndim != 3 or d.shape != self._spatial_map.shape:
-                            raise ValueError(
-                                f"'{k}' must have 3 dimensions (z, y, x) and same shape as the spatial map ({self._spatial_map.shape})")
-                        dn[k] = np.reshape(d, -1)  # flatten the data
+                        # For non-sparse data, data arrays should have shape [z, y, x]
+                        # For sparse data (old format), data arrays can be 3D (need flattening) or 1D (already flat)
+                        if not self._is_sparse:
+                            if d.ndim != 3 or d.shape != self._spatial_map.shape:
+                                raise ValueError(
+                                    f"'{k}' must have 3 dimensions (z, y, x) and same shape as the spatial map ({self._spatial_map.shape})")
+                            dn[k] = np.reshape(d, -1)  # flatten the data
+                        else:
+                            # For sparse data, accept both 3D (old API) and 1D (new API)
+                            if d.ndim == 3:
+                                # Old API: 3D array, need to flatten
+                                if d.shape != self._spatial_map.shape:
+                                    raise ValueError(
+                                        f"'{k}' must have same shape as the spatial map ({self._spatial_map.shape}) when 3D")
+                                dn[k] = np.reshape(d, -1)  # flatten the data
+                            elif d.ndim == 1:
+                                # New API: already 1D, just verify length
+                                expected_length = np.prod(self._spatial_map.shape)
+                                if d.shape[0] != expected_length:
+                                    raise ValueError(
+                                        f"'{k}' must have length {expected_length} to match spatial map")
+                            else:
+                                raise ValueError(
+                                    f"'{k}' must be either 3D or 1D for sparse data")
                 out_data.append(dn)
             return out_data
         data_AntiStokes = flatten_data(data_AntiStokes)
@@ -965,7 +1105,10 @@ class Data:
         path = concatenate_paths(self._path, name)
         return Data.AnalysisResults(self._file, path, self._spatial_map, self._spatial_map_px_size)
 
-    def add_data(self, PSD: np.ndarray, frequency: np.ndarray, scanning: dict, freq_units='GHz', timestamp: np.ndarray = None, compression: FileAbstraction.Compression = FileAbstraction.Compression()):
+    def add_data(self, PSD: np.ndarray, frequency: np.ndarray, scanning: dict, freq_units='GHz', 
+                 element_size: tuple = None, element_size_unit: str = None,
+                 timestamp: np.ndarray = None, compression: FileAbstraction.Compression = FileAbstraction.Compression(),
+                 sparse: bool = None):
         """
         Add data to the current data group.
 
@@ -974,8 +1117,11 @@ class Data:
         the required specifications before adding them.
 
         Args:
-            PSD (np.ndarray): A 2D numpy array representing the Power Spectral Density (PSD) data. The last dimension contains the spectra.
-            frequency (np.ndarray): A 1D or 2D numpy array representing the frequency data. 
+            PSD (np.ndarray): A numpy array representing the Power Spectral Density (PSD) data. 
+                The last dimension contains the spectra.
+                For sparse data: 2D array with dimensions [N_points, spectrum]
+                For non-sparse data: 4D array with dimensions [z, y, x, spectrum]
+            frequency (np.ndarray): A 1D or multi-dimensional numpy array representing the frequency data. 
                 It must be broadcastable to the shape of the PSD array.
             scanning (dict): A dictionary containing scanning-related data. It may include:
                 - 'Spatial_map' (optional): A dictionary containing (up to) 3 arrays (x, y, z) and a string (units)
@@ -984,8 +1130,12 @@ class Data:
                 - 'Cartesian_visualisation_pixel' (optional): A list or array of 3 float values 
                   representing the pixel size in the z, y, and x dimensions (unused dimensions can be set to None).
                 - 'Cartesian_visualisation_pixel_unit' (optional): A string representing the unit of the pixel size (e.g. 'um').
+            element_size (tuple, optional): Pixel size for z, y, x dimensions. Used for non-sparse data at Data group level.
+            element_size_unit (str, optional): Unit for element_size.
             timestamp (np.ndarray): the timestamp associated with each spectrum.
                 It must be a 1D array with the same length as the PSD array.
+            sparse (bool, optional): If True, sets Sparse attribute to true. If False, sets to false. 
+                If None, doesn't set the attribute (defaults to false).
 
 
         Raises:
@@ -998,9 +1148,26 @@ class Data:
         except ValueError as e:
             raise ValueError(f"frequency (shape: {frequency.shape}) is not broadcastable to PSD (shape: {PSD.shape}): {e}")
 
+        # Set sparse attribute if specified
+        if sparse is not None:
+            sync(self._file.create_attr(self._group, 'Sparse', sparse))
+            # Update internal state
+            self._is_sparse = sparse
+        
+        # Add element_size at Data group level if provided
+        if element_size is not None:
+            sync(self._file.create_attr(self._group, 'element_size', element_size))
+            if element_size_unit is not None:
+                units.add_to_attribute(self._file, self._group, 'element_size', element_size_unit)
+
         # define the scanning_is_valid variable to check if at least one of 'Spatial_map' or 'Cartesian_visualisation'
-        # is present in the scanning dictionary
+        # is present in the scanning dictionary (or if non-sparse data with no scanning info)
         scanning_is_valid = False
+        
+        # For non-sparse data, scanning is optional
+        if not self._is_sparse and not scanning:
+            scanning_is_valid = True
+            
         if 'Spatial_map' in scanning:
             sm = scanning['Spatial_map']
             size = 0
