@@ -7,8 +7,6 @@ import numpy as np
 import os
 from datetime import datetime
 
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
 import brimfile as brim
 

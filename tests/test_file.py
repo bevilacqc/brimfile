@@ -4,14 +4,9 @@ Unit tests for the File class in brimfile.
 
 import pytest
 import os
-import shutil
 
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
 import brimfile as brim
-
-
 class TestFileCreation:
     """Tests for File creation and initialization."""
     

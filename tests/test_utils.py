@@ -2,12 +2,9 @@
 Unit tests for utility functions in brimfile.
 """
 
-import pytest
+
 import numpy as np
 
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
 from brimfile.utils import concatenate_paths, var_to_singleton, np_array_to_smallest_int_type
 
