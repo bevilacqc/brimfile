@@ -6,21 +6,10 @@ import pytest
 import numpy as np
 import os
 import shutil
-import tempfile
 from datetime import datetime
 
 
 import brimfile as brim
-
-
-@pytest.fixture
-def temp_dir():
-    """Create a temporary directory for test files."""
-    tmpdir = tempfile.mkdtemp()
-    yield tmpdir
-    # Cleanup
-    if os.path.exists(tmpdir):
-        shutil.rmtree(tmpdir)
 
 
 @pytest.fixture
@@ -60,9 +49,9 @@ def sample_data():
 
 
 @pytest.fixture
-def simple_brim_file(temp_dir, sample_data):
+def simple_brim_file(tmp_path, sample_data):
     """Create a simple brim file for testing."""
-    filename = os.path.join(temp_dir, 'test_file.brim.zarr')
+    filename = os.path.join(tmp_path, 'test_file.brim.zarr')
     
     f = brim.File.create(filename, store_type=brim.StoreType.AUTO)
     
@@ -110,9 +99,9 @@ def simple_brim_file(temp_dir, sample_data):
 
 
 @pytest.fixture
-def empty_brim_file(temp_dir):
+def empty_brim_file(tmp_path):
     """Create an empty brim file for testing."""
-    filename = os.path.join(temp_dir, 'empty_file.brim.zarr')
+    filename = os.path.join(tmp_path, 'empty_file.brim.zarr')
     f = brim.File.create(filename, store_type=brim.StoreType.AUTO)
     f.close()
     

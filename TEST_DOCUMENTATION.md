@@ -72,10 +72,11 @@ This document provides a comprehensive overview of the test suite added to the b
 
 Defined in `conftest.py`:
 
-- **temp_dir**: Temporary directory with auto-cleanup
 - **sample_data**: Generated Lorentzian spectral data
 - **simple_brim_file**: Pre-populated brim file for testing
 - **empty_brim_file**: Empty brim file for creation tests
+
+Note: Tests use pytest's built-in `tmp_path` fixture for temporary directories.
 
 ## Running Tests
 

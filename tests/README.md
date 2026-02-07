@@ -81,10 +81,11 @@ The test suite covers:
 
 The `conftest.py` file provides shared fixtures:
 
-- **`temp_dir`**: Temporary directory for test files (auto-cleanup)
 - **`sample_data`**: Generated sample spectral data for testing
 - **`simple_brim_file`**: Pre-created brim file with sample data
 - **`empty_brim_file`**: Empty brim file for testing creation operations
+
+Note: Tests use pytest's built-in `tmp_path` fixture for temporary directories with automatic cleanup.
 
 ## Writing New Tests
 

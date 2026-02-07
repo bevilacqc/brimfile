@@ -10,18 +10,18 @@ import brimfile as brim
 class TestFileCreation:
     """Tests for File creation and initialization."""
     
-    def test_create_file_auto_store(self, temp_dir):
+    def test_create_file_auto_store(self, tmp_path):
         """Test creating a file with AUTO store type."""
-        filename = os.path.join(temp_dir, 'test_create.brim.zarr')
+        filename = os.path.join(tmp_path, 'test_create.brim.zarr')
         f = brim.File.create(filename, store_type=brim.StoreType.AUTO)
         assert f is not None
         assert f.is_valid()
         f.close()
         assert os.path.exists(filename)
     
-    def test_create_file_zarr_store(self, temp_dir):
+    def test_create_file_zarr_store(self, tmp_path):
         """Test creating a file with ZARR store type."""
-        filename = os.path.join(temp_dir, 'test_zarr.brim.zarr')
+        filename = os.path.join(tmp_path, 'test_zarr.brim.zarr')
         f = brim.File.create(filename, store_type=brim.StoreType.ZARR)
         assert f is not None
         f.close()
@@ -39,9 +39,9 @@ class TestFileCreation:
         assert f.is_valid()
         f.close()
     
-    def test_open_nonexistent_file(self, temp_dir):
+    def test_open_nonexistent_file(self, tmp_path):
         """Test that opening a non-existent file raises an error."""
-        filename = os.path.join(temp_dir, 'nonexistent.brim.zarr')
+        filename = os.path.join(tmp_path, 'nonexistent.brim.zarr')
         with pytest.raises(Exception):
             brim.File(filename, mode='r')
     
@@ -157,16 +157,16 @@ class TestFileClosing:
 class TestStoreTypes:
     """Tests for different store types."""
     
-    def test_auto_store_type(self, temp_dir):
+    def test_auto_store_type(self, tmp_path):
         """Test AUTO store type detection."""
-        filename = os.path.join(temp_dir, 'auto_store.brim.zarr')
+        filename = os.path.join(tmp_path, 'auto_store.brim.zarr')
         f = brim.File.create(filename, store_type=brim.StoreType.AUTO)
         assert f.is_valid()
         f.close()
     
-    def test_zarr_store_type(self, temp_dir):
+    def test_zarr_store_type(self, tmp_path):
         """Test explicit ZARR store type."""
-        filename = os.path.join(temp_dir, 'zarr_store.brim.zarr')
+        filename = os.path.join(tmp_path, 'zarr_store.brim.zarr')
         f = brim.File.create(filename, store_type=brim.StoreType.ZARR)
         assert f.is_valid()
         f.close()

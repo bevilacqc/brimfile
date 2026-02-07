@@ -14,9 +14,9 @@ import brimfile as brim
 class TestCompleteWorkflow:
     """Tests for complete read/write workflows."""
     
-    def test_create_write_read_workflow(self, temp_dir, sample_data):
+    def test_create_write_read_workflow(self, tmp_path, sample_data):
         """Test complete workflow: create file, write data, read it back."""
-        filename = os.path.join(temp_dir, 'workflow_test.brim.zarr')
+        filename = os.path.join(tmp_path, 'workflow_test.brim.zarr')
         
         # Create and write
         f = brim.File.create(filename, store_type=brim.StoreType.AUTO)
@@ -78,9 +78,9 @@ class TestCompleteWorkflow:
         
         f.close()
     
-    def test_multiple_data_groups_workflow(self, temp_dir, sample_data):
+    def test_multiple_data_groups_workflow(self, tmp_path, sample_data):
         """Test workflow with multiple data groups."""
-        filename = os.path.join(temp_dir, 'multi_data.brim.zarr')
+        filename = os.path.join(tmp_path, 'multi_data.brim.zarr')
         
         f = brim.File.create(filename, store_type=brim.StoreType.AUTO)
         
@@ -115,9 +115,9 @@ class TestCompleteWorkflow:
         
         f.close()
     
-    def test_multiple_analysis_results_workflow(self, temp_dir, sample_data):
+    def test_multiple_analysis_results_workflow(self, tmp_path, sample_data):
         """Test workflow with multiple analysis results in one data group."""
-        filename = os.path.join(temp_dir, 'multi_ar.brim.zarr')
+        filename = os.path.join(tmp_path, 'multi_ar.brim.zarr')
         
         f = brim.File.create(filename, store_type=brim.StoreType.AUTO)
         
@@ -268,9 +268,9 @@ class TestEdgeCases:
         
         f.close()
     
-    def test_single_point_spectrum(self, temp_dir):
+    def test_single_point_spectrum(self, tmp_path):
         """Test handling of single-point spectra."""
-        filename = os.path.join(temp_dir, 'single_point.brim.zarr')
+        filename = os.path.join(tmp_path, 'single_point.brim.zarr')
         
         # Create minimal data
         PSD = np.random.rand(1, 1, 1, 50)
@@ -289,9 +289,9 @@ class TestEdgeCases:
         assert len(PSD_read) == 50
         f.close()
     
-    def test_large_frequency_array(self, temp_dir):
+    def test_large_frequency_array(self, tmp_path):
         """Test handling of large frequency arrays."""
-        filename = os.path.join(temp_dir, 'large_freq.brim.zarr')
+        filename = os.path.join(tmp_path, 'large_freq.brim.zarr')
         
         # Create data with large frequency array
         PSD = np.random.rand(2, 2, 2, 1000)
@@ -315,9 +315,9 @@ class TestEdgeCases:
 class TestFileLifecycle:
     """Tests for file lifecycle management."""
     
-    def test_create_close_reopen(self, temp_dir, sample_data):
+    def test_create_close_reopen(self, tmp_path, sample_data):
         """Test creating, closing, and reopening a file."""
-        filename = os.path.join(temp_dir, 'lifecycle.brim.zarr')
+        filename = os.path.join(tmp_path, 'lifecycle.brim.zarr')
         
         # Create
         f = brim.File.create(filename, store_type=brim.StoreType.AUTO)
@@ -342,9 +342,9 @@ class TestFileLifecycle:
         md.add(brim.Metadata.Type.Experiment, {'Test': Attr(1, 'unit')}, local=True)
         f.close()
     
-    def test_multiple_sequential_operations(self, temp_dir, sample_data):
+    def test_multiple_sequential_operations(self, tmp_path, sample_data):
         """Test multiple sequential file operations."""
-        filename = os.path.join(temp_dir, 'sequential.brim.zarr')
+        filename = os.path.join(tmp_path, 'sequential.brim.zarr')
         
         # Create and add first data group
         f = brim.File.create(filename, store_type=brim.StoreType.AUTO)
