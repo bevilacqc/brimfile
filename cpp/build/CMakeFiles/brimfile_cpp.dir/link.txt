@@ -1,2 +1,0 @@
-/usr/bin/ar qc libbrimfile_cpp.a CMakeFiles/brimfile_cpp.dir/src/brimfile.cpp.o
-/usr/bin/ranlib libbrimfile_cpp.a

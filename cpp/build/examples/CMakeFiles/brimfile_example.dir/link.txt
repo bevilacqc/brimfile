@@ -1,1 +1,0 @@
-/usr/bin/c++ -g -Wl,--dependency-file=CMakeFiles/brimfile_example.dir/link.d CMakeFiles/brimfile_example.dir/example.cpp.o -o brimfile_example  ../libbrimfile_cpp.a /usr/lib/x86_64-linux-gnu/libpython3.12.so
