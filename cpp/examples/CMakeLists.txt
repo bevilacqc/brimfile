@@ -1,0 +1,3 @@
+add_executable(brimfile_example example.cpp)
+target_link_libraries(brimfile_example PRIVATE brimfile_cpp)
+target_include_directories(brimfile_example PRIVATE ${Python3_INCLUDE_DIRS})
