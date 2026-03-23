@@ -268,9 +268,14 @@ MetadataItem py_to_metadata_item(PyObject* obj) {
     if (!obj || obj == Py_None) return item;
 
     // The Python MetadataItem has .value and .units attributes.
+    // Clear any lingering error before each attribute access so that a
+    // missing attribute is treated as "not set" rather than propagating
+    // an unexpected exception.
+    PyErr_Clear();
     detail::PyObj py_val(PyObject_GetAttrString(obj, "value"));
+    PyErr_Clear();
     detail::PyObj py_units(PyObject_GetAttrString(obj, "units"));
-    PyErr_Clear(); // non-fatal if attributes missing
+    PyErr_Clear();
 
     if (py_val && py_val.get() != Py_None) {
         item.value = py_to_string(py_val.get());
